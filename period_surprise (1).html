@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>For You 🌸</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes float   { 0%,100%{transform:translateY(0)}   50%{transform:translateY(-10px)} }
+    @keyframes fadeUp  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fall    { 0%{transform:translateY(-30px) rotate(0deg);opacity:1} 100%{transform:translateY(110vh) rotate(400deg);opacity:0} }
+    @keyframes shimmer { 0%,100%{opacity:.5} 50%{opacity:1} }
+    @keyframes pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+    @keyframes ping    { 0%{transform:scale(.8);opacity:1} 80%,100%{transform:scale(2);opacity:0} }
+
+    .float    { animation: float   3s ease-in-out infinite; }
+    .fade-up  { animation: fadeUp  .45s ease forwards; }
+    .bar { width:3px; border-radius:2px; background:#f97316; animation: shimmer .8s ease-in-out infinite; }
+    .particle { position:absolute; top:-30px; font-size:18px; pointer-events:none; animation: fall linear infinite; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#fed7aa; cursor:pointer; border:none; transition:all .2s; }
+    .dot.active { background:#f97316; transform:scale(1.35); }
+    body { font-family: ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, sans-serif; }
+
+    #tap-prompt {
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; background:rgba(255,247,237,0.92);
+      border-radius:1.5rem; z-index:10; cursor:pointer;
+      animation: fadeUp .3s ease forwards;
+    }
+    #tap-prompt .tap-icon { font-size:56px; animation: pulse 2s ease-in-out infinite; margin-bottom:12px; }
+    #tap-prompt p { font-size:15px; color:#c2410c; font-weight:500; }
+    #tap-prompt small { font-size:12px; color:#fb923c; margin-top:4px; }
+  </style>
+</head>
+<body class="min-h-screen bg-orange-50 flex items-center justify-center p-4">
+
+  <div id="scene" class="relative w-full max-w-md min-h-[520px] flex flex-col items-center justify-center
+       bg-white rounded-3xl shadow-xl overflow-hidden p-8 select-none">
+
+    <!-- tap-to-start overlay -->
+    <div id="tap-prompt" onclick="handleFirstTap()">
+      <div class="tap-icon">🌸</div>
+      <p>Tap to open your surprise</p>
+      <small>♪ music & animations inside</small>
+    </div>
+
+    <!-- particles -->
+    <div id="particles" class="absolute inset-0 overflow-hidden pointer-events-none"></div>
+
+    <!-- ping ring -->
+    <div class="absolute top-6 right-6 w-3 h-3">
+      <span class="absolute inline-flex h-full w-full rounded-full bg-orange-300 opacity-75"
+            style="animation:ping 1.8s cubic-bezier(0,0,.2,1) infinite"></span>
+      <span class="relative inline-flex rounded-full h-3 w-3 bg-orange-400"></span>
+    </div>
+
+    <!-- main emoji -->
+    <div id="main-emoji" class="float text-7xl mb-4 text-center">🌸</div>
+
+    <!-- card -->
+    <div id="msg-card" class="fade-up w-full bg-orange-50 border border-orange-100 rounded-2xl p-5 text-center">
+      <h2 id="msg-title" class="text-lg font-semibold text-orange-700 mb-2">Hey, my love 💕</h2>
+      <p  id="msg-body"  class="text-sm text-orange-900/70 leading-relaxed">
+        I know today's rough. I just want you to know I'm here — with snacks, cuddles,
+        and zero judgment for whatever you're feeling right now.
+      </p>
+      <ul id="checklist" class="mt-4 text-left space-y-1.5 hidden">
+        <li class="flex items-center gap-2 text-xs text-orange-800/80"><span>🍫</span> Chocolate (lots of it)</li>
+        <li class="flex items-center gap-2 text-xs text-orange-800/80"><span>🌡️</span> Heating pad, warmed up</li>
+        <li class="flex items-center gap-2 text-xs text-orange-800/80"><span>🎬</span> Your comfort movies queued</li>
+        <li class="flex items-center gap-2 text-xs text-orange-800/80"><span>🛁</span> Hot bath with bath salts</li>
+        <li class="flex items-center gap-2 text-xs text-orange-800/80"><span>💕</span> Me, right here for you</li>
+      </ul>
+    </div>
+
+    <!-- dots -->
+    <div id="dots" class="flex gap-2 mt-5"></div>
+
+    <!-- buttons -->
+    <div class="flex gap-3 mt-4">
+      <button onclick="prev()" class="px-4 py-2 text-sm rounded-xl border border-orange-200 text-orange-600 hover:bg-orange-50 active:scale-95 transition-all">← back</button>
+      <button id="next-btn" onclick="next()" class="px-5 py-2 text-sm rounded-xl bg-orange-400 text-white font-medium hover:bg-orange-500 active:scale-95 transition-all shadow-sm">next →</button>
+    </div>
+
+    <!-- music bar -->
+    <div class="flex items-center gap-2 mt-5">
+      <div id="music-anim" class="flex items-end gap-[3px] h-4">
+        <div class="bar h-2"   style="animation-delay:0s"></div>
+        <div class="bar h-4"   style="animation-delay:.15s"></div>
+        <div class="bar h-2.5" style="animation-delay:.3s"></div>
+        <div class="bar"       style="height:15px;animation-delay:.1s"></div>
+        <div class="bar h-1.5" style="animation-delay:.25s"></div>
+      </div>
+      <span id="now-playing" class="text-xs text-orange-400 cursor-pointer hover:text-orange-600"
+            onclick="toggleMusic(event)">♪ playing comfort playlist</span>
+    </div>
+  </div>
+
+<script>
+const slides = [
+  { emoji:"🌸", title:"Hey, my love 💕",
+    body:"I know today's rough. I just want you to know I'm here — with snacks, cuddles, and zero judgment for whatever you're feeling right now.",
+    checklist:true, particles:["🌸","✨","💗"] },
+  { emoji:"🍫", title:"Chocolate incoming 🍫",
+    body:"Dark, milk, or white — I've got it all. No stealing your last piece this time. (I genuinely mean it.)",
+    particles:["🍫","⭐","🍬"] },
+  { emoji:"🌡️", title:"Heating pad is ready 🌡️",
+    body:"The warm cozy blob for your tummy is all set. You don't have to move a single inch. I'll bring everything to you.",
+    particles:["💛","🌟","✨"] },
+  { emoji:"🎬", title:"Movie marathon mode 🎬",
+    body:"I queued up all your favorites — the comfort ones, the cry-ones, the silly ones. Remote is yours. I won't complain. Not even once.",
+    particles:["🎬","⭐","🌙"] },
+  { emoji:"🛁", title:"Cozy bath time 🛁",
+    body:"Hot water, bath salts, candles — all set up. You deserve a full reset. Just soak and let the cramps melt away.",
+    particles:["💙","🕯️","✨"] },
+  { emoji:"💌", title:"You're everything 💌",
+    body:"Period or not, you're the strongest, most wonderful person I know. I love you on the hard days most of all. Always right here. 🧡",
+    particles:["💌","💗","🌸","✨","💛"] },
+];
+
+let current=0, audioCtx=null, musicOn=false, loopTimer=null, started=false;
+
+function handleFirstTap() {
+  document.getElementById('tap-prompt').style.display='none';
+  startMusic();
+  spawnParticles(slides[0].particles);
+}
+
+function buildDots() {
+  const c=document.getElementById('dots'); c.innerHTML='';
+  slides.forEach((_,i)=>{
+    const d=document.createElement('button');
+    d.className='dot'+(i===current?' active':'');
+    d.onclick=e=>{e.stopPropagation();goTo(i);};
+    c.appendChild(d);
+  });
+}
+
+function spawnParticles(emojis) {
+  const c=document.getElementById('particles'); c.innerHTML='';
+  emojis.forEach(em=>{
+    for(let i=0;i<7;i++){
+      const el=document.createElement('span');
+      el.className='particle'; el.textContent=em;
+      el.style.left=(Math.random()*95)+'%';
+      el.style.fontSize=(13+Math.random()*14)+'px';
+      el.style.animation=`fall ${(3.5+Math.random()*4).toFixed(1)}s ${(Math.random()*6).toFixed(1)}s linear infinite`;
+      c.appendChild(el);
+    }
+  });
+}
+
+function goTo(i) {
+  current=i; const s=slides[i];
+  document.getElementById('main-emoji').textContent=s.emoji;
+  document.getElementById('msg-title').textContent=s.title;
+  document.getElementById('msg-body').textContent=s.body;
+  document.getElementById('checklist').classList.toggle('hidden',!s.checklist);
+  const card=document.getElementById('msg-card');
+  card.style.animation='none'; void card.offsetWidth; card.style.animation='fadeUp .45s ease forwards';
+  spawnParticles(s.particles); buildDots();
+  const btn=document.getElementById('next-btn');
+  if(i===slides.length-1){btn.textContent='🌸 restart';btn.onclick=()=>goTo(0);}
+  else{btn.textContent='next →';btn.onclick=next;}
+}
+
+function next(){ goTo((current+1)%slides.length); }
+function prev(){ goTo((current-1+slides.length)%slides.length); }
+
+/* ── Audio ── */
+function startMusic() {
+  try {
+    if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    musicOn=true;
+    document.getElementById('now-playing').textContent='♪ playing comfort playlist';
+    playMelody();
+  } catch(e){ console.warn('Audio error',e); }
+}
+
+function playNote(freq,t,dur,vol=0.09){
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type='sine'; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+.06);
+  g.gain.linearRampToValueAtTime(vol*.6,t+dur*.6);
+  g.gain.linearRampToValueAtTime(0,t+dur);
+  o.start(t); o.stop(t+dur+.05);
+}
+
+function playMelody(){
+  if(!audioCtx||audioCtx.state!=='running') return;
+  const notes=[
+    [523.25,.4],[587.33,.4],[659.25,.4],[698.46,.4],
+    [783.99,.6],[698.46,.4],[659.25,.4],[587.33,.4],
+    [523.25,.8],[493.88,.4],[523.25,.4],[587.33,.4],
+    [659.25,.6],[587.33,.4],[523.25,.8]
+  ];
+  let t=audioCtx.currentTime+.1, total=0;
+  notes.forEach(([f,d])=>{ playNote(f,t,d); t+=d+.05; total+=d+.05; });
+  loopTimer=setTimeout(playMelody,(total*1000)+150);
+}
+
+function toggleMusic(e){
+  e.stopPropagation();
+  if(!audioCtx){ startMusic(); return; }
+  clearTimeout(loopTimer);
+  if(audioCtx.state==='running'){
+    audioCtx.suspend(); musicOn=false;
+    document.getElementById('now-playing').textContent='♪ paused — tap to resume';
+  } else {
+    audioCtx.resume(); musicOn=true;
+    document.getElementById('now-playing').textContent='♪ playing comfort playlist';
+    playMelody();
+  }
+}
+
+goTo(0);
+buildDots();
+</script>
+</body>
+</html>
